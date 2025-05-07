@@ -3,7 +3,7 @@ import sqlite3
 import os
 import numpy as np
 import face_recognition
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
@@ -14,6 +14,9 @@ import threading
 import time
 import schedule
 from tkinter import font as tkfont
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import Font
 
 # ========== KONFIGURASI ==========
 FACE_DETECTION_MODEL = "hog"  # "hog" untuk CPU, "cnn" untuk GPU
@@ -21,12 +24,13 @@ FACE_MATCHING_TOLERANCE = 0.6
 TARGET_FRAME_WIDTH = 640
 UPDATE_INTERVAL = 300  # 5 menit dalam detik
 ROLE_OPTIONS = ['Guru', 'Siswa', 'Staf', 'Admin']
+LEVEL_OPTIONS = ['7', '8', '9', '10']
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"  # Password akan di-hash
 
 # Waktu presensi
 MORNING_ENTRY_TIME = dt_time(7, 30)  # 07:30 WIB masuk sekolah
-AFTERNOON_EXIT_TIME = dt_time(15, 0)  # 15:00 WIB pulang sekolah
+AFTERNOON_EXIT_TIME = dt_time(13, 0)  # 13:00 WIB pulang sekolah
 GRACE_PERIOD = 15  # toleransi 15 menit
 
 # ========== INISIALISASI DIREKTORI ==========
@@ -36,6 +40,7 @@ def init_directories():
     os.makedirs('screenshots', exist_ok=True)
     os.makedirs('attendance_screenshots', exist_ok=True)
     os.makedirs('attendance_records', exist_ok=True)
+    os.makedirs('excel_reports', exist_ok=True)
 
 init_directories()
 
@@ -84,6 +89,7 @@ class FaceDatabase:
         self.known_face_encodings = []
         self.known_face_names = []
         self.known_face_roles = []
+        self.known_face_levels = []
         self.last_update = 0
         self.init_db()
         self.load_known_faces()
@@ -96,6 +102,7 @@ class FaceDatabase:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     role TEXT,
+                    level TEXT DEFAULT '',
                     image_path TEXT,
                     encoding BLOB,
                     timestamp TEXT,
@@ -126,9 +133,13 @@ class FaceDatabase:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     role TEXT NOT NULL,
+                    level TEXT,
                     date TEXT NOT NULL,
                     entry_time TEXT,
                     exit_time TEXT,
+                    entry_emotion TEXT,
+                    exit_emotion TEXT,
+                    duration TEXT,
                     status TEXT
                 )
             ''')
@@ -139,20 +150,38 @@ class FaceDatabase:
             self.known_face_encodings = []
             self.known_face_names = []
             self.known_face_roles = []
+            self.known_face_levels = []
 
             cursor = self.conn.cursor()
-            cursor.execute("SELECT name, role, encoding FROM faces")
-            
-            for name, role, encoding_blob in cursor.fetchall():
-                encoding = np.frombuffer(encoding_blob, dtype=np.float64)
-                self.known_face_encodings.append(encoding)
-                self.known_face_names.append(name)
-                self.known_face_roles.append(role)
+            # Periksa apakah kolom level ada
+            cursor.execute("PRAGMA table_info(faces)")
+            columns = [column[1] for column in cursor.fetchall()]
+            has_level = 'level' in columns
+
+            if has_level:
+                cursor.execute("SELECT name, role, level, encoding FROM faces")
+                for name, role, level, encoding_blob in cursor.fetchall():
+                    encoding = np.frombuffer(encoding_blob, dtype=np.float64)
+                    self.known_face_encodings.append(encoding)
+                    self.known_face_names.append(name)
+                    self.known_face_roles.append(role)
+                    self.known_face_levels.append(level)
+            else:
+                # Jika kolom level belum ada, tambahkan kolom
+                cursor.execute("ALTER TABLE faces ADD COLUMN level TEXT DEFAULT ''")
+                self.conn.commit()
+                cursor.execute("SELECT name, role, encoding FROM faces")
+                for name, role, encoding_blob in cursor.fetchall():
+                    encoding = np.frombuffer(encoding_blob, dtype=np.float64)
+                    self.known_face_encodings.append(encoding)
+                    self.known_face_names.append(name)
+                    self.known_face_roles.append(role)
+                    self.known_face_levels.append('')  # Default empty level
             
             self.last_update = time.time()
             print(f"Memuat {len(self.known_face_names)} wajah yang dikenal")
 
-    def add_face(self, name, role, face_image, face_encoding, emotion):
+    def add_face(self, name, role, level, face_image, face_encoding, emotion):
         with self.lock:
             timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             img_filename = f"known_faces/{name}_{timestamp}.jpg"
@@ -162,16 +191,17 @@ class FaceDatabase:
             
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT INTO faces (name, role, image_path, encoding, timestamp, emotion)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (name, role, img_filename, encoding_blob, timestamp, emotion))
+                INSERT INTO faces (name, role, level, image_path, encoding, timestamp, emotion)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (name, role, level, img_filename, encoding_blob, timestamp, emotion))
             self.conn.commit()
             
             # Update data di memori
             self.known_face_encodings.append(face_encoding)
             self.known_face_names.append(name)
             self.known_face_roles.append(role)
-            print(f"Wajah {name} berhasil didaftarkan sebagai {role}")
+            self.known_face_levels.append(level)
+            print(f"Wajah {name} berhasil didaftarkan sebagai {role} level {level}")
 
     def verify_admin(self, username, password):
         cursor = self.admin_conn.cursor()
@@ -182,7 +212,7 @@ class FaceDatabase:
             return bcrypt.checkpw(password.encode('utf-8'), result[0])
         return False
     
-    def record_attendance(self, name, role, is_entry=True):
+    def record_attendance(self, name, role, level, is_entry=True, emotion=None):
         today = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
@@ -199,20 +229,91 @@ class FaceDatabase:
                 if cursor.fetchone() is None:
                     # Rekam presensi masuk
                     cursor.execute('''
-                        INSERT INTO attendance (name, role, date, entry_time, status)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (name, role, today, current_time, 'Hadir'))
+                        INSERT INTO attendance (name, role, level, date, entry_time, entry_emotion, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (name, role, level, today, current_time, emotion, 'Hadir'))
                     self.attendance_conn.commit()
                     print(f"Presensi masuk {name} dicatat pada {current_time}")
             else:
+                # Hitung durasi
+                cursor.execute('''
+                    SELECT entry_time FROM attendance 
+                    WHERE name = ? AND date = ? AND exit_time IS NULL
+                ''', (name, today))
+                
+                entry_time_str = cursor.fetchone()[0]
+                entry_time = datetime.strptime(f"{today} {entry_time_str}", "%Y-%m-%d %H:%M:%S")
+                exit_time = datetime.strptime(f"{today} {current_time}", "%Y-%m-%d %H:%M:%S")
+                duration = exit_time - entry_time
+                
+                # Format durasi menjadi HH:MM:SS
+                hours, remainder = divmod(duration.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                
                 # Rekam presensi pulang
                 cursor.execute('''
                     UPDATE attendance 
-                    SET exit_time = ?, status = 'Pulang'
+                    SET exit_time = ?, exit_emotion = ?, duration = ?, status = 'Pulang'
                     WHERE name = ? AND date = ? AND exit_time IS NULL
-                ''', (current_time, name, today))
+                ''', (current_time, emotion, duration_str, name, today))
                 self.attendance_conn.commit()
                 print(f"Presensi pulang {name} dicatat pada {current_time}")
+    
+    def export_to_excel(self, date=None):
+        if date is None:
+            date = datetime.now().strftime('%Y-%m-%d')
+        
+        with self.lock:
+            cursor = self.attendance_conn.cursor()
+            cursor.execute('''
+                SELECT name, role, level, date, entry_time, exit_time, duration, entry_emotion, exit_emotion, status
+                FROM attendance
+                WHERE date = ?
+                ORDER BY name
+            ''', (date,))
+            
+            data = cursor.fetchall()
+            
+            if not data:
+                return False
+            
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=[
+                'Nama', 'Role', 'Level', 'Tanggal', 
+                'Jam Masuk', 'Jam Pulang', 'Durasi', 
+                'Emosi Saat Datang', 'Emosi Saat Pulang', 'Status'
+            ])
+            
+            # Create Excel file
+            filename = f"excel_reports/attendance_report_{date}.xlsx"
+            writer = pd.ExcelWriter(filename, engine='openpyxl')
+            df.to_excel(writer, index=False, sheet_name='Attendance')
+            
+            # Get workbook and worksheet for styling
+            workbook = writer.book
+            worksheet = writer.sheets['Attendance']
+            
+            # Style header
+            header_font = Font(bold=True)
+            for cell in worksheet[1]:
+                cell.font = header_font
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2) * 1.2
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            workbook.save(filename)
+            return filename
 
 # ========== ADMIN LOGIN GUI ==========
 class AdminLoginWindow:
@@ -223,58 +324,84 @@ class AdminLoginWindow:
         self.authenticated = False
         
         self.root = tk.Toplevel(parent)
-        self.root.title("Admin Login")
-        self.root.geometry("400x350")
+        self.root.title("Admin Login - Praxis High School")
+        self.root.geometry("450x500")
         self.root.resizable(False, False)
         self.style.apply_style(self.root)
         
+        # Create a canvas for the logo and school name
+        self.canvas = tk.Canvas(self.root, width=400, height=150, bg=self.style.bg_color, highlightthickness=0)
+        self.canvas.pack(pady=(20, 10))
+        
+        # Draw school logo (placeholder - replace with actual logo)
+        self.draw_logo()
+        
         self.create_widgets()
         
+    def draw_logo(self):
+        try:
+            # Try to load actual logo
+            logo_img = Image.open("praxcis-removebg-preview.png")
+            logo_img = logo_img.resize((100, 100), Image.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(logo_img)
+            
+            # Create circular mask for logo
+            self.canvas.create_image(200, 50, image=self.logo_photo)
+        except:
+            # Fallback to simple circle if logo not found
+            self.canvas.create_oval(150, 0, 250, 100, fill=self.style.primary_color, outline="")
+        
+        # Add school name
+        self.canvas.create_text(200, 120, text="Praxis High School", 
+                              font=("Helvetica", 14, "bold"), 
+                              fill=self.style.primary_color)
+        
     def create_widgets(self):
-        # Header Frame
-        header_frame = ttk.Frame(self.root, style='TFrame')
-        header_frame.pack(fill=tk.X, padx=20, pady=20)
+        # Main container
+        container = ttk.Frame(self.root, style='TFrame')
+        container.pack(fill=tk.BOTH, expand=True, padx=30, pady=10)
         
-        # Logo (placeholder)
-        logo_img = Image.new('RGB', (80, 80), color=self.style.primary_color)
-        logo_img = ImageTk.PhotoImage(logo_img)
-        logo_label = ttk.Label(header_frame, image=logo_img)
-        logo_label.image = logo_img
-        logo_label.pack()
+        # Login title
+        ttk.Label(container, text="ADMINISTRATOR LOGIN", 
+                 font=self.style.title_font).pack(pady=(10, 20))
         
-        ttk.Label(header_frame, text="ADMIN LOGIN", font=self.style.title_font).pack(pady=10)
-        
-        # Form Frame
-        form_frame = ttk.Frame(self.root, style='TFrame')
-        form_frame.pack(fill=tk.X, padx=40, pady=10)
+        # Form frame
+        form_frame = ttk.Frame(container, style='TFrame')
+        form_frame.pack(fill=tk.X, pady=10)
         
         # Username
-        ttk.Label(form_frame, text="Username:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Username:", font=self.style.subtitle_font).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.username_entry = ttk.Entry(form_frame, font=self.style.normal_font)
-        self.username_entry.grid(row=0, column=1, sticky=tk.EW, pady=5)
+        self.username_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=5)
         
         # Password
-        ttk.Label(form_frame, text="Password:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Password:", font=self.style.subtitle_font).grid(row=1, column=0, sticky=tk.W, pady=5)
         self.password_entry = ttk.Entry(form_frame, show="•", font=self.style.normal_font)
-        self.password_entry.grid(row=1, column=1, sticky=tk.EW, pady=5)
+        self.password_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=5)
         
-        # Error Message
+        # Error message
         self.error_label = ttk.Label(form_frame, text="", style='Error.TLabel')
         self.error_label.grid(row=2, column=0, columnspan=2, pady=5)
         
-        # Button Frame
-        button_frame = ttk.Frame(self.root, style='TFrame')
-        button_frame.pack(fill=tk.X, padx=40, pady=20)
+        # Button frame
+        button_frame = ttk.Frame(container, style='TFrame')
+        button_frame.pack(fill=tk.X, pady=20)
         
-        ttk.Button(button_frame, text="LOGIN", command=self.attempt_login, 
-                  style='TButton').pack(fill=tk.X, pady=5)
+        # Login button
+        login_btn = ttk.Button(button_frame, text="LOGIN", command=self.attempt_login, 
+                             style='Accent.TButton')
+        login_btn.pack(fill=tk.X, pady=5, ipady=5)
         
         # Footer
-        ttk.Label(self.root, text="© 2023 School Attendance System", 
-                 font=("Helvetica", 8), style='TLabel').pack(side=tk.BOTTOM, pady=10)
+        footer_frame = ttk.Frame(self.root, style='TFrame')
+        footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
+        
+        ttk.Label(footer_frame, text="© 2025 Praxis High School Attendance System", 
+                 font=("Helvetica", 8), style='TLabel').pack()
         
         # Bind Enter key
         self.root.bind('<Return>', lambda e: self.attempt_login())
+        self.username_entry.focus()
         
     def attempt_login(self):
         username = self.username_entry.get()
@@ -297,51 +424,83 @@ class AttendanceSystem:
         self.voice_engine = pyttsx3.init()
         self.voice_engine.setProperty('rate', 150)
         self.recognized_faces = {}
+        self.screenshot_taken = set()  # Untuk melacak screenshot yang sudah diambil
         self.schedule_jobs()
         
     def schedule_jobs(self):
         # Jadwalkan pembersihan data harian
         schedule.every().day.at("00:00").do(self.clear_daily_data)
+        # Jadwalkan export Excel setiap hari
+        schedule.every().day.at("23:59").do(self.export_daily_report)
         
     def clear_daily_data(self):
         self.recognized_faces.clear()
+        self.screenshot_taken.clear()  # Bersihkan juga daftar screenshot
         print("Data harian telah dibersihkan")
+    
+    def export_daily_report(self):
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        filename = self.face_db.export_to_excel(yesterday)
+        if filename:
+            print(f"Laporan harian berhasil diekspor ke: {filename}")
+        else:
+            print("Tidak ada data presensi untuk diekspor")
         
-    def check_attendance_time(self, frame, name, role):
+    def check_attendance_time(self, frame, name, role, level):
         current_time = datetime.now().time()
         today = datetime.now().strftime('%Y-%m-%d')
+        emotion = detect_emotion(frame)
         
-        # Cek waktu presensi masuk (07:00-07:45)
+        # Cek waktu presensi masuk (07:15-07:45)
         if (self.is_time_between(current_time, 
                                dt_time(MORNING_ENTRY_TIME.hour, MORNING_ENTRY_TIME.minute - GRACE_PERIOD),
                                dt_time(MORNING_ENTRY_TIME.hour, MORNING_ENTRY_TIME.minute + GRACE_PERIOD))):
             
-            if name not in self.recognized_faces or self.recognized_faces[name].date() != datetime.now().date():
-                self.recognized_faces[name] = datetime.now()
-                self.face_db.record_attendance(name, role, is_entry=True)
+            if name not in self.recognized_faces or self.recognized_faces[name]['time'].date() != datetime.now().date():
+                self.recognized_faces[name] = {
+                    'time': datetime.now(),
+                    'entry_emotion': emotion
+                }
+                self.face_db.record_attendance(name, role, level, is_entry=True, emotion=emotion)
                 
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 filename = f"attendance_screenshots/ENTRY_{name}_{timestamp}.jpg"
                 cv2.imwrite(filename, frame)
                 
-                self.voice_engine.say(f"Selamat pagi {name}, selamat belajar!")
+                # Efek suara kedatangan
+                self.voice_engine.say(f"Welcome {name}")
+                self.voice_engine.say(f"Have a good study")
+                self.voice_engine.say(f"Current emotion: {emotion}")
                 self.voice_engine.runAndWait()
         
-        # Cek waktu presensi pulang (15:00-15:15)
-        elif (self.is_time_between(current_time, 
-                                 dt_time(AFTERNOON_EXIT_TIME.hour, AFTERNOON_EXIT_TIME.minute),
-                                 dt_time(AFTERNOON_EXIT_TIME.hour, AFTERNOON_EXIT_TIME.minute + GRACE_PERIOD))):
+        # Cek waktu presensi pulang (setelah 13:00)
+        elif current_time >= dt_time(AFTERNOON_EXIT_TIME.hour, AFTERNOON_EXIT_TIME.minute):
             
-            if name in self.recognized_faces and self.recognized_faces[name].date() == datetime.now().date():
-                self.face_db.record_attendance(name, role, is_entry=False)
+            if name in self.recognized_faces and self.recognized_faces[name]['time'].date() == datetime.now().date():
+                self.face_db.record_attendance(name, role, level, is_entry=False, emotion=emotion)
                 del self.recognized_faces[name]
                 
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 filename = f"attendance_screenshots/EXIT_{name}_{timestamp}.jpg"
                 cv2.imwrite(filename, frame)
                 
-                self.voice_engine.say(f"Selamat jalan {name}, hati-hati di jalan!")
+                # Efek suara kepulangan
+                self.voice_engine.say(f"Goodbye {name}")
+                self.voice_engine.say(f"Current emotion: {emotion}")
+                self.voice_engine.say("Be careful on the road")
                 self.voice_engine.runAndWait()
+    
+    def take_screenshot(self, frame, name):
+        """Ambil screenshot hanya jika belum pernah diambil untuk wajah ini hari ini"""
+        today = datetime.now().strftime('%Y-%m-%d')
+        key = f"{name}_{today}"
+        
+        if key not in self.screenshot_taken:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"screenshots/{name}_{timestamp}.jpg"
+            cv2.imwrite(filename, frame)
+            self.screenshot_taken.add(key)
+            print(f"Screenshot diambil untuk {name}")
     
     def is_time_between(self, check_time, start_time, end_time):
         if start_time <= end_time:
@@ -399,21 +558,20 @@ class FaceRecognitionApp:
                         if matches[best_match_index]:
                             name = self.face_db.known_face_names[best_match_index]
                             role = self.face_db.known_face_roles[best_match_index]
+                            level = self.face_db.known_face_levels[best_match_index]
                             emotion = detect_emotion(frame[top:bottom, left:right])
                             
                             # Tampilkan info
                             cv2.putText(frame, name, (left, top - 10), 
                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                            cv2.putText(frame, f"{role} | {emotion}", (left, top - 40), 
+                            cv2.putText(frame, f"{role} | Level {level} | {emotion}", (left, top - 40), 
                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                             
                             # Cek waktu presensi
-                            self.attendance_system.check_attendance_time(frame, name, role)
+                            self.attendance_system.check_attendance_time(frame, name, role, level)
                             
-                            # Simpan screenshot
-                            if name not in self.attendance_system.recognized_faces:
-                                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                                cv2.imwrite(f"screenshots/{name}_{timestamp}.jpg", frame)
+                            # Ambil screenshot (hanya 1x per wajah per hari)
+                            self.attendance_system.take_screenshot(frame, name)
                         else:
                             cv2.putText(frame, "Unknown", (left, top - 10), 
                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
@@ -430,6 +588,8 @@ class FaceRecognitionApp:
                     self.show_admin_login()
                 elif key == ord('s') and self.admin_mode and face_locations:
                     self.register_new_face(frame, face_locations[0], face_encodings[0])
+                elif key == ord('e') and self.admin_mode:
+                    self.export_report()
         
         except Exception as e:
             print(f"Error: {e}")
@@ -445,6 +605,8 @@ class FaceRecognitionApp:
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             cv2.putText(frame, "Press 'S' to Register Face", (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(frame, "Press 'E' to Export Report", (10, 90),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         
         # Tampilkan waktu saat ini
         current_time = datetime.now().strftime('%H:%M:%S')
@@ -454,7 +616,7 @@ class FaceRecognitionApp:
         # Tampilkan info waktu presensi
         cv2.putText(frame, f"Masuk: {MORNING_ENTRY_TIME.strftime('%H:%M')}±{GRACE_PERIOD}m", 
                    (10, frame.shape[0] - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-        cv2.putText(frame, f"Pulang: {AFTERNOON_EXIT_TIME.strftime('%H:%M')}±{GRACE_PERIOD}m", 
+        cv2.putText(frame, f"Pulang: Setelah {AFTERNOON_EXIT_TIME.strftime('%H:%M')}", 
                    (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
     
     def show_admin_login(self):
@@ -479,11 +641,19 @@ class FaceRecognitionApp:
             self.face_db.add_face(
                 registration_window.name,
                 registration_window.role,
+                registration_window.level,
                 face_image,
                 face_encoding,
                 emotion
             )
             self.face_db.load_known_faces()
+    
+    def export_report(self):
+        filename = self.face_db.export_to_excel()
+        if filename:
+            messagebox.showinfo("Export Success", f"Laporan berhasil diekspor ke:\n{filename}")
+        else:
+            messagebox.showwarning("Export Failed", "Tidak ada data presensi untuk diekspor")
     
     def cleanup(self):
         self.cap.release()
@@ -505,10 +675,11 @@ class RegistrationWindow:
         self.registration_complete = False
         self.name = ""
         self.role = ""
+        self.level = ""
         
         self.root = tk.Toplevel(parent)
         self.root.title("Register New Face")
-        self.root.geometry("500x600")
+        self.root.geometry("500x650")  # Diperbesar untuk menambahkan level
         self.root.resizable(False, False)
         self.style.apply_style(self.root)
         
@@ -554,9 +725,20 @@ class RegistrationWindow:
         self.role_combobox.current(0)
         self.role_combobox.grid(row=1, column=1, sticky=tk.EW, pady=5)
         
+        # Level (hanya untuk siswa)
+        ttk.Label(form_frame, text="Level (for students):").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.level_combobox = ttk.Combobox(
+            form_frame, 
+            values=LEVEL_OPTIONS, 
+            state="readonly",
+            font=self.style.normal_font
+        )
+        self.level_combobox.current(0)
+        self.level_combobox.grid(row=2, column=1, sticky=tk.EW, pady=5)
+        
         # Error message
         self.error_label = ttk.Label(form_frame, text="", style='Error.TLabel')
-        self.error_label.grid(row=2, column=0, columnspan=2, pady=5)
+        self.error_label.grid(row=3, column=0, columnspan=2, pady=5)
         
         # Buttons
         button_frame = ttk.Frame(self.root, style='TFrame')
@@ -571,6 +753,7 @@ class RegistrationWindow:
     def register(self):
         self.name = self.name_entry.get().strip()
         self.role = self.role_combobox.get()
+        self.level = self.level_combobox.get() if self.role == "Siswa" else ""
         
         if not self.name:
             self.error_label.config(text="Full name must be filled!")
