@@ -1,4 +1,15 @@
-# Dokumentasi Cara Install
+# Dokumentasi
+
+School attendance adalah catatan kehadiran siswa di sekolah sesuai dengan jadwal yang telah ditetapkan. Kehadiran ini mencerminkan tingkat kedisiplinan dan tanggung jawab siswa terhadap kewajiban belajar. Data attendance digunakan oleh pihak sekolah untuk memantau konsistensi siswa dalam mengikuti kegiatan belajar mengajar, serta sebagai dasar dalam memberikan tindak lanjut jika terjadi ketidakhadiran yang berulang tanpa keterangan yang jelas. 
+
+
+
+
+
+
+
+**Cara Install** 
+
 Yang perlu di install : 
 
  1. cv2 : Pengolahan gambar dan video
@@ -90,7 +101,7 @@ b. Jika Anda menggunakan Linux, mungkin perlu menginstall dependensi sistem terl
 
 
 
-# Dokumentasi Proses
+#  Proses
 
 1. Inisialisasi dan Setup Awal
     - Instal library seperti OpenCV, face_recognition, numpy, pyttsx3.
@@ -137,7 +148,101 @@ b. Jika Anda menggunakan Linux, mungkin perlu menginstall dependensi sistem terl
 
 
 
-# Dokumentasi Cara Penggunaan
+ # Cara kerja
+
+1. Inisialisasi Sistem
+ - Membuat struktur folder yang diperlukan (img, known_faces, screenshots, dll)
+ - Membuat/membuka database SQLite untuk menyimpan data wajah
+ - Membuat/membuka spreadsheet Excel untuk pencatatan data
+ - Memuat engine text-to-speech (pyttsx3) untuk memberikan feedback suara
+
+2. Proses Pengenalan Wajah
+
+a.  Kamera diaktifkan dan mulai menangkap frame secara real-time
+
+b.  Setiap frame dikonversi dari format BGR ke RGB untuk diproses oleh library face_recognition
+
+c.  Sistem mendeteksi lokasi wajah dalam frame menggunakan face_recognition.face_locations()
+
+d. Untuk setiap wajah yang terdeteksi:
+- Ekstrak encoding wajah menggunakan face_recognition.face_encodings()
+- Bandingkan dengan database wajah yang dikenal
+- Jika wajah dikenali:
+
+     ~ Tampilkan kotak hijau di sekitar wajah dengan nama dan peran (role)
+
+     ~ Jika ini pertama kali wajah dikenali dalam sesi ini:
+
+     ~ Catat kehadiran (log_attendance)
+
+     ~ Simpan screenshot wajah ke folder sesuai waktu (pagi/siang)
+
+     ~ Beri salam sesuai waktu (selamat pagi/siang/sore)
+
+- Jika wajah tidak dikenali:
+
+      ~ Tampilkan kotak merah dengan label "Unknown"
+
+     ~ Tampilkan petunjuk untuk menekan 's' untuk mendaftarkan wajah baru
+
+3. Pendaftaran Wajah Baru
+
+- Tekan tombol 's' saat wajah tidak dikenal terdeteksi
+- Sistem akan membuka window Tkinter untuk memasukkan:
+
+     ~ Nama
+
+     ~ Kelas
+
+     ~ Peran (role)
+
+- Wajah akan disimpan ke:
+
+     ~ Folder known_faces sebagai referensi masa depan
+
+     ~ Folder img dengan timestamp
+
+     ~ Database SQLite
+
+     ~ Spreadsheet Excel
+
+- Sistem akan memuat ulang database wajah yang dikenal
+
+4. Pencatatan Kehadiran
+
+- Sistem mencatat waktu kedatangan pertama di hari tersebut
+- Ketika wajah yang sama terdeteksi lagi:
+
+     ~ Mencatat waktu kepulangan
+
+     ~ Menghitung durasi kehadiran
+
+     ~ Menyimpan data ke spreadsheet
+
+     ~ Memberikan ucapan selamat jalan
+
+5. Fitur Tambahan
+
+- Text-to-Speech: Memberikan feedback suara saat wajah dikenali
+
+- Penyimpanan Screenshot Otomatis: Menyimpan gambar wajah yang terdeteksi
+
+- Pembagian Waktu: Screenshot pagi/siang disimpan di folder berbeda
+
+- Backup Harian: Data kehadiran harian disimpan dalam file Excel terpisah
+
+6. Penghentian Sistem
+
+- Tekan tombol 'q' untuk keluar dari program
+- Sistem akan menyimpan data kehadiran harian ke file Excel sebelum keluar
+
+
+
+
+
+
+
+#  Cara Penggunaan
 
 1. Datang ke Area Absensi
    - Pastikan wajah kamu terlihat jelas di depan kamera
@@ -156,6 +261,27 @@ b. Jika Anda menggunakan Linux, mungkin perlu menginstall dependensi sistem terl
     -  kamu sudah terabsen pulang.
    
 
+# riset 
+
+1. library excel
 
 
+#  testing (sebelum tes di kelas)
+**kendala**
+1. Masih banyak eror
+2. Kurangnya akurasi 
 
+**Tambahan ( Yang diperbaiki) :**
+
+1. Memberi pilihan level
+2. Data kehadiran dan kepulangan dimasukan dalam format excel 
+3. Efek suara saat kedatangan dan kepulangan
+4. Ubah jam kepulangan menjadi diatas jam 1 siang
+5. Upgrade GUI
+
+
+# Dokumentasi Testing 
+**kendala**
+
+1. waktu nya 
+2. GUI masih bermasalah 
