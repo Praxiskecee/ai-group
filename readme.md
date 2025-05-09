@@ -1,287 +1,174 @@
 # Dokumentasi
 
-School attendance adalah catatan kehadiran siswa di sekolah sesuai dengan jadwal yang telah ditetapkan. Kehadiran ini mencerminkan tingkat kedisiplinan dan tanggung jawab siswa terhadap kewajiban belajar. Data attendance digunakan oleh pihak sekolah untuk memantau konsistensi siswa dalam mengikuti kegiatan belajar mengajar, serta sebagai dasar dalam memberikan tindak lanjut jika terjadi ketidakhadiran yang berulang tanpa keterangan yang jelas. 
+**School attendance** adalah catatan kehadiran siswa di sekolah sesuai dengan jadwal yang telah ditetapkan. Kehadiran ini mencerminkan tingkat kedisiplinan dan tanggung jawab siswa terhadap kewajiban belajar. Data attendance digunakan oleh pihak sekolah untuk memantau konsistensi siswa dalam mengikuti kegiatan belajar mengajar, serta sebagai dasar dalam memberikan tindak lanjut jika terjadi ketidakhadiran yang berulang tanpa keterangan yang jelas.
 
+---
 
+## Cara Install
 
+Yang perlu di-install:
 
+1. `cv2` : Pengolahan gambar dan video
+2. `sqlite3` : Database lokal
+3. `pathlib` : Membuat, menghapus, memeriksa keberadaan file/folder
+4. `os` : Operasi file/folder
+5. `tkinter` : Antarmuka grafis
+6. `messagebox`, `simpledialog` : Dialog pesan & input pengguna
+7. `datetime`, `date` : Pengolahan waktu dan tanggal
+8. `Pillow` : Manipulasi gambar
+9. `numpy` : Operasi matematika & array
+10. `face_recognition` : Deteksi & pengenalan wajah
+11. `openpyxl` : Baca/tulis file Excel
+12. `pyttsx3` : Text-to-Speech (output suara)
+13. `pandas` : Analisis data (DataFrame)
 
+### Cara meng-install package:
 
+1. Pastikan Anda sudah menginstall Python.
 
-**Cara Install** 
+2. Install package menggunakan pip:
 
-Yang perlu di install : 
+   ```bash
+   pip install opencv-python pillow face-recognition openpyxl pyttsx3 pandas
+   ```
 
- 1. cv2 : Pengolahan gambar dan video
+   Untuk masalah khusus:
 
- 2.  sqlite3 : Database lokal
+   * Jika mengalami error saat install `face_recognition`:
 
- 3. pathlib : Membuat, menghapus, memeriksa keberadaan file/folder.
-
- 4. os : Operasi file/folder
-
- 5. tkinter : Membuat antarmuka grafis 
-
- 6. messagebox, simpledialog : Menampilkan kotak dialog pesan interaktif kepada pengguna & Meminta input dari pengguna melalui dialog pop-up
-
- 7.  datetime, date :  mengolah data waktu dan tanggal
-
- 8. Pillow : Manipulasi gambar
-
- 9. numpy : Operasi matematika & array
-
- 10. face_recognition : Deteksi & pengenalan wajah
-
- 11. openpyxl : Baca/tulis file Excel 
-
- 12. pyttsx3 : Text-to-Speech (output suara)
-
- 13. pandas : Analisis data (DataFrame)
-
-
- Cara meng install package: 
-
- 1.  Pastikan Anda sudah menginstall Python
-
- 2. Install package menggunakan pip
-
-    Buka terminal/command prompt dan jalankan perintah berikut:
-
- ~ Untuk package utama:
-
-    pip install opencv-python sqlite3 pillow face-recognition openpyxl pyttsx3 pandas
-
- ~ Untuk masalah khusus:
-
-   a. Jika Anda mengalami masalah menginstall face-recognition:
-
+     ```bash
      pip install cmake
-
      pip install dlib
-
      pip install face-recognition
+     ```
+   * Untuk pengguna Linux:
 
-b. Jika Anda menggunakan Linux, mungkin perlu menginstall dependensi sistem terlebih dahulu:
+     ```bash
+     sudo apt-get install python3-tk
+     sudo apt-get install libopencv-dev
+     ```
 
-      sudo apt-get install python3-tk
+3. `os` dan `sqlite3` sudah termasuk dalam Python standard library.
 
-      sudo apt-get install libopencv-dev
+4. Verifikasi instalasi:
 
-   ~ Cara menginstall OS
+   Buka Python Interpreter dan jalankan:
 
-        1. Modul os sudah termasuk dalam 
-           instalasi standar Python
+   ```python
+   import cv2
+   import sqlite3
+   import pathlib
+   import os
+   import tkinter as tk
+   from PIL import Image, ImageTk
+   import numpy as np
+   import face_recognition
+   from openpyxl import Workbook, load_workbook
+   import pyttsx3
+   import pandas as pd
 
-       2. Gunakan, import os
+   print("Semua package berhasil diimport!")
+   ```
 
- 3. Verifikasi instalasi 
+Jika tidak ada error, berarti semua package sudah terinstall dengan benar.
 
- Anda bisa memverifikasi bahwa semua package terinstall dengan benar dengan menjalankan Python interpreter dan mencoba mengimport masing-masing package 
+---
 
-     import cv2
-     import sqlite3
-     import pathlib
-     import os
-     import tkinter as tk
-     from PIL import Image, ImageTk
-     import numpy as np
-     import face_recognition
-     from openpyxl import Workbook,load_workbook
-     import pyttsx3
-     import pandas as pd
+## Proses
 
-     print("Semua package berhasil diimport!")
- 
- 
- 
- Jika tidak ada error, berarti semua package sudah terinstall dengan benar.
+1. **Inisialisasi dan Setup Awal**
 
+   * Instal library
+   * Buat folder dan file penyimpanan wajah, metadata, riwayat
 
+2. **Membuka Kamera dan Menangkap Frame**
 
+   * `cv2.VideoCapture()` untuk tangkap frame secara real-time
 
+3. **Deteksi dan Pengenalan Wajah**
 
+   * Deteksi wajah
+   * Encode wajah
+   * Bandingkan encoding dengan database
 
-#  Proses
+4. **Pencatatan Kehadiran Otomatis**
 
-1. Inisialisasi dan Setup Awal
-    - Instal library seperti OpenCV, face_recognition, numpy, pyttsx3.
-    - Buat folder dan file untuk menyimpan: Encoding wajah, Metadata pengguna, Riwayat kehadiran
+   * Jika wajah dikenali → catat waktu datang/pulang → simpan ke Excel + DB
 
-2. Membuka Kamera dan Menangkap Frame
-    - Akses webcam menggunakan cv2.VideoCapture().
-    - Tangkap frame secara real-time untuk diproses.
+5. **Penyapa Otomatis (TTS)**
 
-3. Deteksi dan Pengenalan Wajah
-     - Deteksi wajah dalam frame
-     - Encode wajah yang terdeteksi
-     - Bandingkan encoding wajah dengan database wajah yang sudah tersimpan.
+   * "Selamat pagi, \[nama]" / "Selamat jalan, \[nama]"
 
-4. Pencatatan Kehadiran Otomatis
-   - Jika wajah dikenali:
+6. **Registrasi Wajah Baru**
 
-         ~ Catat waktu datang jika belum tercatat.
-         ~ Jika sudah pernah tercatat dan wajah tidak terdeteksi lagi → waktu pulang.
-   - Hitung durasi kehadiran dari waktu datang hingga pulang.
-   - Simpan data ke dalam file Excel dan database lokal.
+   * Tekan `s` → isi nama, kelas, peran → simpan wajah + metadata
 
-5. Penyapa Otomatis (Text-to-Speech)
-    - Setelah wajah dikenali: Sistem menyapa pengguna saat datang: “Selamat pagi, [nama]”
-    - Sistem mengucapkan selamat jalan saat pulang: “Selamat jalan, [nama]”
-    - Menggunakan library pyttsx3.
+7. **Penyimpanan Screenshot Kehadiran**
 
-6. Registrasi Wajah Baru
-    - Jika wajah tidak dikenali: Sistem menampilkan perintah: tekan s untuk mendaftar. Setelah ditekan, muncul form (CLI atau GUI) untuk input: Nama, Kelas, Peran.
-    - Wajah diambil dan encoding disimpan ke faces.npy, metadata ke faces.json.
+   * Otomatis saat presensi → disimpan ke folder lokal
 
-7. Penyimpanan Screenshot Kehadiran
-    - Saat pengguna hadir dan dikenali, sistem otomatis mengambil screenshot.
-    - Gambar disimpan ke folder lokal
+8. **Akses Riwayat Kehadiran**
 
-8. Penyimpanan dan Akses Riwayat Kehadiran
-    - Data kehadiran pengguna disimpan dalam: File Excel, Database lokal SQLite
+   * Disimpan dalam Excel dan SQLite
 
-9. Data Permanen
-    - Encoding wajah dan metadata hanya disimpan lokal.
+9. **Data Permanen**
 
-10. Multi-user Recognition
-     - Nama pengguna muncul pada masing-masing wajah yang dikenali.
+   * Disimpan lokal (tidak di-cloud)
 
+10. **Multi-user Recognition**
 
+    * Sistem bisa mengenali beberapa wajah sekaligus
 
- # Cara kerja
+---
 
-1. Inisialisasi Sistem
- - Membuat struktur folder yang diperlukan (img, known_faces, screenshots, dll)
- - Membuat/membuka database SQLite untuk menyimpan data wajah
- - Membuat/membuka spreadsheet Excel untuk pencatatan data
- - Memuat engine text-to-speech (pyttsx3) untuk memberikan feedback suara
+## Cara Kerja
 
-2. Proses Pengenalan Wajah
+1. **Inisialisasi Sistem**
 
-a.  Kamera diaktifkan dan mulai menangkap frame secara real-time
+   * Buat struktur folder, buka DB, buka Excel, load TTS
 
-b.  Setiap frame dikonversi dari format BGR ke RGB untuk diproses oleh library face_recognition
+2. **Pengenalan Wajah**
 
-c.  Sistem mendeteksi lokasi wajah dalam frame menggunakan face_recognition.face_locations()
+   * Kamera aktif → konversi BGR → RGB
+   * Deteksi wajah → encode wajah → bandingkan DB
+   * Jika cocok → tampilkan info, catat kehadiran, screenshot, TTS
+   * Jika tidak cocok → label "Unknown" + prompt untuk registrasi
 
-d. Untuk setiap wajah yang terdeteksi:
-- Ekstrak encoding wajah menggunakan face_recognition.face_encodings()
-- Bandingkan dengan database wajah yang dikenal
-- Jika wajah dikenali:
+3. **Pendaftaran Wajah Baru**
 
-     ~ Tampilkan kotak hijau di sekitar wajah dengan nama dan peran (role)
+   * Tekan `s` → isi form Tkinter → simpan ke DB dan folder
 
-     ~ Jika ini pertama kali wajah dikenali dalam sesi ini:
+4. **Pencatatan Kehadiran**
 
-     ~ Catat kehadiran (log_attendance)
+   * Catat waktu datang → saat muncul kembali → catat waktu pulang → hitung durasi
 
-     ~ Simpan screenshot wajah ke folder sesuai waktu (pagi/siang)
+5. **Fitur Tambahan**
 
-     ~ Beri salam sesuai waktu (selamat pagi/siang/sore)
+   * TTS, screenshot otomatis, backup harian Excel
 
-- Jika wajah tidak dikenali:
+6. **Penghentian Sistem**
 
-      ~ Tampilkan kotak merah dengan label "Unknown"
+   * Tekan `q` → data disimpan otomatis
 
-     ~ Tampilkan petunjuk untuk menekan 's' untuk mendaftarkan wajah baru
+---
 
-3. Pendaftaran Wajah Baru
+## Cara Penggunaan
 
-- Tekan tombol 's' saat wajah tidak dikenal terdeteksi
-- Sistem akan membuka window Tkinter untuk memasukkan:
+1. **Datang ke Area Absensi**
 
-     ~ Nama
+   * Berdiri jelas di depan kamera
 
-     ~ Kelas
+2. **Jika Wajah Sudah Terdaftar**
 
-     ~ Peran (role)
+   * Sistem otomatis mengenali → langsung tercatat hadir
 
-- Wajah akan disimpan ke:
+3. **Jika Belum Terdaftar**
 
-     ~ Folder known_faces sebagai referensi masa depan
+   * Minta admin untuk registrasi
 
-     ~ Folder img dengan timestamp
+4. **Saat Pulang Sekolah**
 
-     ~ Database SQLite
+   * Ulangi proses → sistem mencatat waktu pulang
 
-     ~ Spreadsheet Excel
+---
 
-- Sistem akan memuat ulang database wajah yang dikenal
-
-4. Pencatatan Kehadiran
-
-- Sistem mencatat waktu kedatangan pertama di hari tersebut
-- Ketika wajah yang sama terdeteksi lagi:
-
-     ~ Mencatat waktu kepulangan
-
-     ~ Menghitung durasi kehadiran
-
-     ~ Menyimpan data ke spreadsheet
-
-     ~ Memberikan ucapan selamat jalan
-
-5. Fitur Tambahan
-
-- Text-to-Speech: Memberikan feedback suara saat wajah dikenali
-
-- Penyimpanan Screenshot Otomatis: Menyimpan gambar wajah yang terdeteksi
-
-- Pembagian Waktu: Screenshot pagi/siang disimpan di folder berbeda
-
-- Backup Harian: Data kehadiran harian disimpan dalam file Excel terpisah
-
-6. Penghentian Sistem
-
-- Tekan tombol 'q' untuk keluar dari program
-- Sistem akan menyimpan data kehadiran harian ke file Excel sebelum keluar
-
-
-
-
-
-
-
-#  Cara Penggunaan
-
-1. Datang ke Area Absensi
-   - Pastikan wajah kamu terlihat jelas di depan kamera
-   - Berdiri di jarak yang pas, tidak terlalu jauh atau terlalu dekat.
-
-2. Jika Wajahmu Sudah Terdaftar 
-     - Kamera akan otomatis mengenali wajahmu
-     - Kamu sudah terabsen hadir
-
-3. Jika Wajahmu Belum Terdaftar
-     - Segera minta bantuan guru/operator untuk mendaftarkan wajahmu
-     - Setelah terdaftar, wajahmu akan dikenali secara otomatis saat absensi berikutnya
-
-4. Saat Pulang Sekolah
-    - Ulangi lagi dengan menghadap ke kamera.
-    -  kamu sudah terabsen pulang.
-   
-
-# riset 
-
-1. library excel
-
-
-#  testing (sebelum tes di kelas)
-**kendala**
-1. Masih banyak eror
-2. Kurangnya akurasi 
-
-**Tambahan ( Yang diperbaiki) :**
-
-1. Memberi pilihan level
-2. Data kehadiran dan kepulangan dimasukan dalam format excel 
-3. Efek suara saat kedatangan dan kepulangan
-4. Ubah jam kepulangan menjadi diatas jam 1 siang
-5. Upgrade GUI
-
-
-# Dokumentasi Testing 
-**kendala**
-
-1. waktu nya 
-2. GUI masih bermasalah 
