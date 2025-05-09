@@ -1,0 +1,10 @@
+opencv-python
+numpy
+face-recognition
+bcrypt
+deepface
+pyttsx3
+pillow
+schedule
+pandas
+openpyxl
