@@ -1,174 +1,146 @@
-# Dokumentasi
+# 🎓 Sistem Kehadiran Sekolah Berbasis Face Recognition
 
-**School attendance** adalah catatan kehadiran siswa di sekolah sesuai dengan jadwal yang telah ditetapkan. Kehadiran ini mencerminkan tingkat kedisiplinan dan tanggung jawab siswa terhadap kewajiban belajar. Data attendance digunakan oleh pihak sekolah untuk memantau konsistensi siswa dalam mengikuti kegiatan belajar mengajar, serta sebagai dasar dalam memberikan tindak lanjut jika terjadi ketidakhadiran yang berulang tanpa keterangan yang jelas.
+**Dikembangkan oleh:** Praxis High School  
+**Versi:** 1.0
 
 ---
 
-## Cara Install
+## 📌 1. Deskripsi Singkat Sistem
 
-Yang perlu di-install:
+Sistem ini merupakan aplikasi kehadiran digital berbasis **pengenalan wajah** yang dapat digunakan oleh siswa, guru, staf, dan admin. Dengan integrasi kamera, sistem mengenali wajah secara real-time dan mencatat waktu kehadiran maupun kepulangan, lengkap dengan deteksi **emosi** dan **pengambilan screenshot otomatis**. Hasil presensi dapat diekspor dalam format Excel yang siap digunakan sebagai laporan resmi.
 
-1. `cv2` : Pengolahan gambar dan video
-2. `sqlite3` : Database lokal
-3. `pathlib` : Membuat, menghapus, memeriksa keberadaan file/folder
-4. `os` : Operasi file/folder
-5. `tkinter` : Antarmuka grafis
-6. `messagebox`, `simpledialog` : Dialog pesan & input pengguna
-7. `datetime`, `date` : Pengolahan waktu dan tanggal
-8. `Pillow` : Manipulasi gambar
-9. `numpy` : Operasi matematika & array
-10. `face_recognition` : Deteksi & pengenalan wajah
-11. `openpyxl` : Baca/tulis file Excel
-12. `pyttsx3` : Text-to-Speech (output suara)
-13. `pandas` : Analisis data (DataFrame)
+---
 
-### Cara meng-install package:
+## ✨ 2. Fitur Utama Bagi User
 
-1. Pastikan Anda sudah menginstall Python.
+- ✅ Deteksi wajah otomatis menggunakan kamera
+- ✅ Presensi masuk dan keluar dengan batas waktu yang ditentukan
+- ✅ Deteksi emosi pengguna saat presensi
+- ✅ Screenshot otomatis saat kehadiran
+- ✅ Pendaftaran wajah baru untuk siswa/guru/staf
+- ✅ Login aman untuk admin menggunakan bcrypt
+- ✅ Ekspor laporan kehadiran dan screenshot ke file Excel
+- ✅ GUI interaktif dengan shortcut keyboard
+- ✅ Durasi kehadiran dihitung otomatis
+- ✅ Laporan harian otomatis setiap hari
 
-2. Install package menggunakan pip:
+---
 
+## ⚙️ 3. Cara Install Sistem
+
+### 📁 A. Unduh Kode
+Clone atau download project dari GitHub:
+```bash
+git clone https://github.com/username/sistem-kehadiran-face-recognition.git
+cd sistem-kehadiran-face-recognition
+```
+
+### 🐍 B. Buat Virtual Environment *(Opsional tapi disarankan)*
+```bash
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate       # Linux/macOS
+```
+
+### 📦 C. Install Library Python
+Pastikan Python ≥ 3.8 sudah terinstal.
+
+Gunakan `requirements.txt` yang tersedia:
+```bash
+pip install -r requirements.txt
+```
+
+### 🧱 D. (Linux/macOS) Tambahan: Install Library Sistem
+**Linux (Ubuntu/Debian)**
+```bash
+sudo apt-get install cmake libdlib-dev libboost-all-dev python3-dev libatlas-base-dev -y
+```
+
+**macOS (dengan Homebrew)**
+```bash
+brew install cmake boost
+```
+
+---
+
+## 🧭 4. Panduan Penggunaan (Langkah demi Langkah)
+
+### 🔹 Langkah Awal
+1. Jalankan program:
    ```bash
-   pip install opencv-python pillow face-recognition openpyxl pyttsx3 pandas
+   python final_facedetections.py
    ```
 
-   Untuk masalah khusus:
+2. Aplikasi akan menampilkan antarmuka GUI dengan kamera aktif.
 
-   * Jika mengalami error saat install `face_recognition`:
+### 🔹 Shortcut Panel dan Fungsi Tombol
+| Tombol | Fungsi |
+|--------|--------|
+| `A` | Login sebagai Admin |
+| `S` | Registrasi wajah baru (admin only) |
+| `E` | Ekspor laporan presensi dan screenshot |
+| `X` | Keluar dari mode admin |
+| `D` | Konfirmasi kedatangan (manual) |
+| `P` | Konfirmasi kepulangan (manual) |
+| `Q` | Keluar dari aplikasi |
 
-     ```bash
-     pip install cmake
-     pip install dlib
-     pip install face-recognition
-     ```
-   * Untuk pengguna Linux:
+### 🔹 Proses Presensi Otomatis
+1. Berdiri sejajar dengan kamera.
+2. Sistem akan menampilkan nama dan emosi jika wajah dikenali.
+3. Jika dalam waktu presensi masuk (05:00–09:00), akan muncul jendela konfirmasi.
+4. Tekan “Konfirmasi” untuk mencatat kehadiran.
+5. Sistem akan mengambil screenshot dan mengucapkan sambutan suara.
 
-     ```bash
-     sudo apt-get install python3-tk
-     sudo apt-get install libopencv-dev
-     ```
+### 🔹 Proses Kepulangan Otomatis
+1. Ulangi proses seperti kedatangan tetapi saat jam 13:00–16:00.
+2. Sistem akan mencatat waktu pulang dan menghitung durasi kehadiran.
 
-3. `os` dan `sqlite3` sudah termasuk dalam Python standard library.
+### 🔹 Registrasi Wajah Baru
+1. Tekan `A` untuk login admin.
+2. Masukkan username dan password.
+3. Tekan `S` untuk mulai registrasi wajah.
+4. Tempatkan wajah di depan kamera hingga terdeteksi.
+5. Isi nama, pilih peran dan level (jika siswa), lalu tekan “Register”.
 
-4. Verifikasi instalasi:
+### 🔹 Ekspor Laporan
+- Tekan `E` untuk mengekspor:
+  - **Laporan kehadiran** → ke folder `excel_reports/`
+  - **Laporan screenshot** → juga ke `excel_reports/`
 
-   Buka Python Interpreter dan jalankan:
-
-   ```python
-   import cv2
-   import sqlite3
-   import pathlib
-   import os
-   import tkinter as tk
-   from PIL import Image, ImageTk
-   import numpy as np
-   import face_recognition
-   from openpyxl import Workbook, load_workbook
-   import pyttsx3
-   import pandas as pd
-
-   print("Semua package berhasil diimport!")
-   ```
-
-Jika tidak ada error, berarti semua package sudah terinstall dengan benar.
-
----
-
-## Proses
-
-1. **Inisialisasi dan Setup Awal**
-
-   * Instal library
-   * Buat folder dan file penyimpanan wajah, metadata, riwayat
-
-2. **Membuka Kamera dan Menangkap Frame**
-
-   * `cv2.VideoCapture()` untuk tangkap frame secara real-time
-
-3. **Deteksi dan Pengenalan Wajah**
-
-   * Deteksi wajah
-   * Encode wajah
-   * Bandingkan encoding dengan database
-
-4. **Pencatatan Kehadiran Otomatis**
-
-   * Jika wajah dikenali → catat waktu datang/pulang → simpan ke Excel + DB
-
-5. **Penyapa Otomatis (TTS)**
-
-   * "Selamat pagi, \[nama]" / "Selamat jalan, \[nama]"
-
-6. **Registrasi Wajah Baru**
-
-   * Tekan `s` → isi nama, kelas, peran → simpan wajah + metadata
-
-7. **Penyimpanan Screenshot Kehadiran**
-
-   * Otomatis saat presensi → disimpan ke folder lokal
-
-8. **Akses Riwayat Kehadiran**
-
-   * Disimpan dalam Excel dan SQLite
-
-9. **Data Permanen**
-
-   * Disimpan lokal (tidak di-cloud)
-
-10. **Multi-user Recognition**
-
-    * Sistem bisa mengenali beberapa wajah sekaligus
+### 🔹 Reset & Otomatisasi Harian
+- Setiap jam 00:00 → data kehadiran di-reset.
+- Setiap 23:59 → presensi hari itu diekspor ke Excel.
+- Setiap 05:00 → laporan harian dibuat otomatis.
 
 ---
 
-## Cara Kerja
+## 📁 Struktur Folder Output
 
-1. **Inisialisasi Sistem**
-
-   * Buat struktur folder, buka DB, buka Excel, load TTS
-
-2. **Pengenalan Wajah**
-
-   * Kamera aktif → konversi BGR → RGB
-   * Deteksi wajah → encode wajah → bandingkan DB
-   * Jika cocok → tampilkan info, catat kehadiran, screenshot, TTS
-   * Jika tidak cocok → label "Unknown" + prompt untuk registrasi
-
-3. **Pendaftaran Wajah Baru**
-
-   * Tekan `s` → isi form Tkinter → simpan ke DB dan folder
-
-4. **Pencatatan Kehadiran**
-
-   * Catat waktu datang → saat muncul kembali → catat waktu pulang → hitung durasi
-
-5. **Fitur Tambahan**
-
-   * TTS, screenshot otomatis, backup harian Excel
-
-6. **Penghentian Sistem**
-
-   * Tekan `q` → data disimpan otomatis
+```
+📂 known_faces/
+📂 screenshots/
+    └── siswa/kelas_7/
+    └── guru/
+📂 attendance_screenshots/
+📂 excel_reports/
+📂 daily_reports/
+```
 
 ---
 
-## Cara Penggunaan
+## 🙋 FAQ
+**Q: Bagaimana jika wajah tidak dikenali?**  
+A: Pastikan wajah sudah terdaftar dan pencahayaan cukup.
 
-1. **Datang ke Area Absensi**
-
-   * Berdiri jelas di depan kamera
-
-2. **Jika Wajah Sudah Terdaftar**
-
-   * Sistem otomatis mengenali → langsung tercatat hadir
-
-3. **Jika Belum Terdaftar**
-
-   * Minta admin untuk registrasi
-
-4. **Saat Pulang Sekolah**
-
-   * Ulangi proses → sistem mencatat waktu pulang
+**Q: Apakah bisa presensi dua kali dalam sehari?**  
+A: Sistem akan menolak presensi ganda dan memberikan peringatan.
 
 ---
 
+## 🚀 Siap Digunakan!
+Sistem ini cocok untuk digunakan oleh sekolah, madrasah, dan lembaga pendidikan modern yang ingin menerapkan presensi berbasis teknologi AI.  
+Silakan sesuaikan dan kembangkan lebih lanjut sesuai kebutuhan.
+
+---
+
+© 2025 Praxis High School – All Rights Reserved
